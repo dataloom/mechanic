@@ -361,7 +361,9 @@ class MigratePropertyValuesToDataTable(private val toolbox: Toolbox) : Upgrade {
     }
 
     private fun filterWhitelistedEntitySetsClause(whitelistedEntitySetIds: Set<UUID>): String {
-        val entitySetIds = whitelistedEntitySetIds.joinToString(",")
+//        val entitySetIds = whitelistedEntitySetIds.joinToString(",")
+        val entitySetIds = SOUTH_DAKOTA_ENTITY_SET_IDS.map{ UUID.fromString(it) }.toSet()
+
         return " AND ${ENTITY_SET_ID.name} = ANY('{$entitySetIds}') "
     }
 

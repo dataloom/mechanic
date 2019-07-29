@@ -287,7 +287,7 @@ class UpgradeEntityKeyIdsTable(val toolbox: Toolbox) : Upgrade {
 
         val limiter = Semaphore(16)
 
-        toolbox.entitySets.filter { !it.value.flags.contains(EntitySetFlag.AUDIT) }.keys.parallelStream().forEach { entitySetId ->
+        toolbox.entitySets.filter { !it.value.flags.contains(EntitySetFlag.AUDIT) }.keys.filter{ SOUTH_DAKOTA_ENTITY_SET_IDS.contains(it) }.parallelStream().forEach { entitySetId ->
             val insertSql = getInsertQuery(entitySetId)
             logger.info("Insert SQL for ids sql: {}", insertSql)
             try {
