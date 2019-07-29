@@ -247,11 +247,10 @@ class UpgradeEdgesTable(val toolbox: Toolbox) : Upgrade {
         val nonAuditEdgeEntitySetIds = toolbox.entitySets.values
                 .filter { !it.flags.contains(EntitySetFlag.AUDIT) && it.flags.contains(EntitySetFlag.ASSOCIATION) }
                 .map { it.id }
-                .filter{ SOUTH_DAKOTA_ENTITY_SET_IDS.contains(it) }
                 .toSet()
 
 //        toolbox.entitySets.values.map { it.id }.stream().parallel().forEach { // TODO use this one for all edges
-        toolbox.entitySets.filter { !it.value.flags.contains(EntitySetFlag.AUDIT) }.keys.stream().parallel().forEach {
+        toolbox.entitySets.filter { !it.value.flags.contains(EntitySetFlag.AUDIT) }.keys.filter{ SOUTH_DAKOTA_ENTITY_SET_IDS.contains(it) }.stream().parallel().forEach {
 
             try {
                 limiter.acquire()
