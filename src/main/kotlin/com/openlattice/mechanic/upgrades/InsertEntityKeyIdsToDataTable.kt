@@ -342,7 +342,7 @@ class InsertEntityKeyIdsToDataTable(val toolbox: Toolbox) : Upgrade {
                 PARTITIONS_VERSION.name
         ).joinToString(",")
         return "INSERT INTO ${DATA.name} ($insertCols) " +
-                "SELECT $selectCols FROM ${IDS.name} " +
+                "SELECT $selectCols FROM ${IDS.name} WHERE ${ENTITY_SET_ID.name} = ANY('{${SOUTH_DAKOTA_ENTITY_SET_IDS.joinToString(",")}}') " +
                 "ON CONFLICT DO NOTHING"
     }
 
