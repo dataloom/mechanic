@@ -273,4 +273,9 @@ class MechanicUpgradePod {
     fun insertDeletedChronicleEdgeIds(): InsertDeletedChronicleEdgeIds {
         return InsertDeletedChronicleEdgeIds(toolbox())
     }
+
+    @Bean
+    fun addPartitionsVersionToIdsPrimaryKey(): AddPartitionsVersionToIdsPrimaryKey {
+        return AddPartitionsVersionToIdsPrimaryKey(toolbox())
+    }
 }
