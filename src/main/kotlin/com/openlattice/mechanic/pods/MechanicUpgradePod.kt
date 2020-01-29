@@ -106,13 +106,6 @@ class MechanicUpgradePod {
     }
 
     @Bean
-    fun materializationForeignServer(): MaterializationForeignServer {
-        return MaterializationForeignServer(
-                mapstoresPod.organizationAssemblies() as OrganizationAssemblyMapstore,
-                assemblerConfiguration)
-    }
-
-    @Bean
     fun materializedEntitySetRefresh(): MaterializedEntitySetRefresh {
         return MaterializedEntitySetRefresh(toolbox)
     }
