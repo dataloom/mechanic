@@ -27,6 +27,8 @@ import com.openlattice.authorization.AuthorizationManager
 import com.openlattice.authorization.AuthorizationQueryService
 import com.openlattice.authorization.HazelcastAclKeyReservationService
 import com.openlattice.authorization.HazelcastAuthorizationService
+import com.openlattice.data.storage.ByteBlobDataManager
+import com.openlattice.datastore.pods.ByteBlobServicePod
 import com.openlattice.hazelcast.pods.MapstoresPod
 import com.openlattice.mechanic.MechanicCli.Companion.UPGRADE
 import com.openlattice.mechanic.Toolbox
@@ -43,7 +45,7 @@ import org.springframework.context.annotation.Profile
 import javax.inject.Inject
 
 @Configuration
-@Import(MechanicToolboxPod::class)
+@Import(MechanicToolboxPod::class, ByteBlobServicePod::class)
 @Profile(UPGRADE)
 class MechanicUpgradePod {
 
@@ -64,6 +66,9 @@ class MechanicUpgradePod {
 
     @Inject
     private lateinit var toolbox: Toolbox
+
+    @Inject
+    private lateinit val byteBlobDataManager: ByteBlobDataManager
 
 
     @Bean
@@ -274,5 +279,10 @@ class MechanicUpgradePod {
     @Bean
     fun fixAssociationTypeCatogories(): FixAssociationTypeCatogories {
         return FixAssociationTypeCatogories(toolbox)
+    }
+
+    @Bean
+    fun migrateImmutableEntityDataToS3(): MigrateImmutableEntityDataToS3 {
+        return MigrateImmutableEntityDataToS3(toolbox, byteBlobDataManager)
     }
 }
