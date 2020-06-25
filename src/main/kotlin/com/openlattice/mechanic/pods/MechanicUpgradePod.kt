@@ -23,12 +23,22 @@ package com.openlattice.mechanic.pods
 import com.google.common.eventbus.EventBus
 import com.hazelcast.core.HazelcastInstance
 import com.openlattice.assembler.AssemblerConfiguration
+import com.openlattice.auditing.AuditingConfiguration
+import com.openlattice.auditing.pods.AuditingConfigurationPod
 import com.openlattice.authorization.AuthorizationManager
-import com.openlattice.authorization.AuthorizationQueryService
 import com.openlattice.authorization.HazelcastAclKeyReservationService
 import com.openlattice.authorization.HazelcastAuthorizationService
 import com.openlattice.data.storage.ByteBlobDataManager
-import com.openlattice.datastore.pods.ByteBlobServicePod
+import com.openlattice.data.storage.partitions.PartitionManager
+import com.openlattice.datastore.services.EdmManager
+import com.openlattice.datastore.services.EdmService
+import com.openlattice.datastore.services.EntitySetManager
+import com.openlattice.datastore.services.EntitySetService
+import com.openlattice.edm.PostgresEdmManager
+import com.openlattice.edm.properties.PostgresTypeManager
+import com.openlattice.edm.schemas.SchemaQueryService
+import com.openlattice.edm.schemas.manager.HazelcastSchemaManager
+import com.openlattice.edm.schemas.postgres.PostgresSchemaQueryService
 import com.openlattice.hazelcast.pods.MapstoresPod
 import com.openlattice.mechanic.MechanicCli.Companion.UPGRADE
 import com.openlattice.mechanic.Toolbox
@@ -45,7 +55,7 @@ import org.springframework.context.annotation.Profile
 import javax.inject.Inject
 
 @Configuration
-@Import(MechanicToolboxPod::class, ByteBlobServicePod::class)
+@Import(MechanicToolboxPod::class, AuditingConfigurationPod::class)
 @Profile(UPGRADE)
 class MechanicUpgradePod {
 
@@ -68,8 +78,10 @@ class MechanicUpgradePod {
     private lateinit var toolbox: Toolbox
 
     @Inject
-    private lateinit val byteBlobDataManager: ByteBlobDataManager
+    private lateinit var auditingConfiguration: AuditingConfiguration
 
+    @Inject
+    private lateinit var byteBlobDataManager: ByteBlobDataManager
 
     @Bean
     fun linking(): Linking {
@@ -196,18 +208,13 @@ class MechanicUpgradePod {
     }
 
     @Bean
-    fun authorizationQueryService(): AuthorizationQueryService {
-        return AuthorizationQueryService(hikariDataSource, hazelcastInstance)
-    }
-
-    @Bean
     fun aclKeyReservationService(): HazelcastAclKeyReservationService {
         return HazelcastAclKeyReservationService(hazelcastInstance)
     }
 
     @Bean
     fun authorizationManager(): AuthorizationManager {
-        return HazelcastAuthorizationService(hazelcastInstance, authorizationQueryService(), eventBus)
+        return HazelcastAuthorizationService(hazelcastInstance, eventBus)
     }
 
     @Bean
@@ -250,7 +257,7 @@ class MechanicUpgradePod {
     fun convertAppsToEntityTypeCollections(): ConvertAppsToEntityTypeCollections {
         return ConvertAppsToEntityTypeCollections(toolbox, eventBus)
     }
-  
+
     @Bean
     fun updateAuditEntitySetPartitions(): UpdateAuditEntitySetPartitions {
         return UpdateAuditEntitySetPartitions(toolbox)
@@ -284,5 +291,72 @@ class MechanicUpgradePod {
     @Bean
     fun migrateImmutableEntityDataToS3(): MigrateImmutableEntityDataToS3 {
         return MigrateImmutableEntityDataToS3(toolbox, byteBlobDataManager)
+    }
+
+    fun createMissingEntitySetsForAppConfigs(): CreateMissingEntitySetsForAppConfigs {
+        return CreateMissingEntitySetsForAppConfigs(
+                toolbox,
+                securePrincipalsManager(),
+                authorizationManager(),
+                entitySetManager(),
+                aclKeyReservationService()
+        )
+    }
+
+
+    /* SETUP FOR EntitySetManager */
+
+    @Bean
+    fun postgresEdmManager(): PostgresEdmManager {
+        return PostgresEdmManager(hikariDataSource, hazelcastInstance)
+    }
+
+    @Bean
+    fun partitionManager(): PartitionManager {
+        return PartitionManager(hazelcastInstance, hikariDataSource)
+    }
+
+    @Bean
+    fun postgresTypeManager(): PostgresTypeManager {
+        return PostgresTypeManager(hikariDataSource)
+    }
+
+    @Bean
+    fun schemaQueryService(): SchemaQueryService {
+        return PostgresSchemaQueryService(hikariDataSource)
+    }
+
+    @Bean
+    fun schemaManager(): HazelcastSchemaManager {
+        return HazelcastSchemaManager(hazelcastInstance, schemaQueryService())
+    }
+
+    @Bean
+    fun edmManager(): EdmManager {
+        return EdmService(
+                hikariDataSource,
+                hazelcastInstance,
+                aclKeyReservationService(),
+                authorizationManager(),
+                postgresEdmManager(),
+                postgresTypeManager(),
+                schemaManager()
+        )
+    }
+
+
+    @Bean
+    fun entitySetManager(): EntitySetManager  {
+        return EntitySetService(
+                hazelcastInstance,
+                eventBus,
+                postgresEdmManager(),
+                aclKeyReservationService(),
+                authorizationManager(),
+                partitionManager(),
+                edmManager(),
+                hikariDataSource,
+                auditingConfiguration
+        )
     }
 }
