@@ -44,7 +44,8 @@ class MigrateImmutableEntityDataToS3(
     override fun upgrade(): Boolean {
 
         val partitionManager = PartitionManager(toolbox.hazelcast, toolbox.hds)
-        val pedqs = PostgresEntityDataQueryService(toolbox.hds, byteBlobDataManager, partitionManager)
+        //TODO: Review impact of introducing reader and remove comment
+        val pedqs = PostgresEntityDataQueryService(toolbox.hds,toolbox.hds, byteBlobDataManager, partitionManager)
 
         val immutableEntitySets = getImmutableEntitySets()
 
