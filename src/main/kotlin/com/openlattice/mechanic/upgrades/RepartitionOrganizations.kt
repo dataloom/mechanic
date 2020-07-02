@@ -39,7 +39,7 @@ class RepartitionOrganizations(val toolbox: Toolbox) : Upgrade {
     /* Plan the repartitioning */
 
     private fun getEntityCountByOrg(): Map<UUID, Long> {
-        val orgCounts = mutableMapOf<UUID, Long>()
+        val orgCounts = HazelcastMap.ORGANIZATIONS.getMap(toolbox.hazelcast).keys.associateWith { 0L }.toMutableMap()
 
         BasePostgresIterable(StatementHolderSupplier(toolbox.hds, GET_ENTITY_SET_COUNTS_SQL)) {
             ResultSetAdapters.entitySetId(it) to ResultSetAdapters.count(it)
