@@ -346,4 +346,9 @@ class MechanicUpgradePod {
                 auditingConfiguration
         )
     }
+
+    @Bean
+    fun createStagingSchemaForExistingOrgs(): CreateStagingSchemaForExistingOrgs {
+        return CreateStagingSchemaForExistingOrgs(toolbox, assemblerConfiguration)
+    }
 }
