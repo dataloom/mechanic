@@ -83,7 +83,7 @@ class CreateAtlasUsersAndSetPermissions(
     }
 
     internal fun updateUserCredentialSql(dbUser: String, credential: String): String {
-        return "ALTER ROLE $dbUser WITH ENCRYPTED PASSWORD '$credential'"
+        return "ALTER ROLE ${quote(dbUser)} WITH ENCRYPTED PASSWORD '$credential'"
     }
 
     private fun getColumnsToUserPermissions(): Map<AclKey, Map<Principal, EnumSet<Permission>>> {
