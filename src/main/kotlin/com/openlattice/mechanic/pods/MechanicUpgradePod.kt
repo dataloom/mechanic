@@ -92,6 +92,15 @@ class MechanicUpgradePod {
     @Inject
     private lateinit var hazelcastClientProvider: HazelcastClientProvider
 
+    @Inject
+    private lateinit var principalService: SecurePrincipalsManager
+
+    @Inject
+    private lateinit var aclKeyReservationService: HazelcastAclKeyReservationService
+
+    @Inject
+    private lateinit var authorizationManager: AuthorizationManager
+
     @Bean
     fun linking(): Linking {
         return Linking(toolbox)
@@ -143,15 +152,6 @@ class MechanicUpgradePod {
     @Bean
     fun materializedEntitySetRefresh(): MaterializedEntitySetRefresh {
         return MaterializedEntitySetRefresh(toolbox)
-    }
-
-    @Bean
-    fun organizationDbUserSetup(): OrganizationDbUserSetup {
-        return OrganizationDbUserSetup(
-                mapstoresPod.organizationAssemblies() as OrganizationAssemblyMapstore,
-                assemblerConfiguration,
-                externalDatabaseConnectionManager
-        )
     }
 
     @Bean
@@ -220,49 +220,10 @@ class MechanicUpgradePod {
     }
 
     @Bean
-    fun aclKeyReservationService(): HazelcastAclKeyReservationService {
-        return HazelcastAclKeyReservationService(hazelcastInstance)
-    }
-
-    @Bean
-    fun authorizationManager(): AuthorizationManager {
-        return HazelcastAuthorizationService(hazelcastInstance, eventBus)
-    }
-
-    @Bean
-    fun securePrincipalsManager(): SecurePrincipalsManager {
-        return HazelcastPrincipalService(hazelcastInstance,
-                aclKeyReservationService(),
-                authorizationManager(),
-                eventBus)
-    }
-
-    @Bean
-    fun rectifyOrganizationsUpgrade(): RectifyOrganizationsUpgrade {
-        val dbCredService = DbCredentialService(
-                toolbox.hazelcast,
-                HazelcastLongIdService(hazelcastClientProvider)
-        )
-        val assembler = Assembler(
-                dbCredService,
-                toolbox.hds,
-                authorizationManager(),
-                securePrincipalsManager(),
-                MetricRegistry(),
-                toolbox.hazelcast,
-                eventBus
-        )
-        return RectifyOrganizationsUpgrade(
-                toolbox,
-                assembler
-        )
-    }
-
-    @Bean
     fun grantPublicSchemaAccessToOrgs(): GrantPublicSchemaAccessToOrgs {
         return GrantPublicSchemaAccessToOrgs(
                 mapstoresPod.organizationsMapstore() as OrganizationsMapstore,
-                securePrincipalsManager(),
+                principalService,
                 assemblerConfiguration)
     }
 
@@ -356,8 +317,8 @@ class MechanicUpgradePod {
     fun edmManager(): EdmManager {
         return EdmService(
                 hazelcastInstance,
-                aclKeyReservationService(),
-                authorizationManager(),
+                aclKeyReservationService,
+                authorizationManager,
                 postgresTypeManager(),
                 schemaManager()
         )
@@ -365,28 +326,10 @@ class MechanicUpgradePod {
 
 
     @Bean
-    fun entitySetManager(): EntitySetManager {
-        return EntitySetService(
-                hazelcastInstance,
-                eventBus,
-                aclKeyReservationService(),
-                authorizationManager(),
-                partitionManager(),
-                edmManager(),
-                hikariDataSource,
-                auditingConfiguration
-        )
-    }
-
-    @Bean
     fun removeLinkingDataFromDataTable(): RemoveLinkingDataFromDataTable {
         return RemoveLinkingDataFromDataTable(toolbox)
     }
 
-    @Bean
-    fun createStagingSchemaForExistingOrgs(): CreateStagingSchemaForExistingOrgs {
-        return CreateStagingSchemaForExistingOrgs(toolbox, assemblerConfiguration, externalDatabaseConnectionManager)
-    }
 
     @Bean
     fun grantAppRolesReadOnEntitySetCollections(): GrantAppRolesReadOnEntitySetCollections {
@@ -396,11 +339,6 @@ class MechanicUpgradePod {
     @Bean
     fun addDbCredUsernames(): AddDbCredUsernames {
         return AddDbCredUsernames(toolbox, assemblerConfiguration)
-    }
-
-    @Bean
-    fun createAtlasUsersAndSetPermissions(): CreateAtlasUsersAndSetPermissions {
-        return CreateAtlasUsersAndSetPermissions(toolbox, externalDatabaseConnectionManager)
     }
 
     @Bean
