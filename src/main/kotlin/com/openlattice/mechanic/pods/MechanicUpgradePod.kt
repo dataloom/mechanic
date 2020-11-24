@@ -448,10 +448,11 @@ class MechanicUpgradePod {
     fun createAllOrgMetadataEntitySets(): CreateAllOrgMetadataEntitySets {
         return CreateAllOrgMetadataEntitySets(
                 toolbox,
-                organizationMetadataEntitySetsService(),
                 organizationService(),
+                entitySetManager(),
                 securePrincipalsManager(),
-                authorizationManager()
+                authorizationManager(),
+                edmManager()
         )
     }
 

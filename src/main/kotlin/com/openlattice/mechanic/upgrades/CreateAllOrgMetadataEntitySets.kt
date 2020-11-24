@@ -3,31 +3,45 @@ package com.openlattice.mechanic.upgrades
 import com.hazelcast.query.Predicates
 import com.openlattice.authorization.*
 import com.openlattice.authorization.mapstores.PrincipalMapstore
+import com.openlattice.datastore.services.EdmManager
+import com.openlattice.datastore.services.EntitySetManager
+import com.openlattice.edm.EntitySet
+import com.openlattice.edm.set.EntitySetFlag
+import com.openlattice.edm.type.PropertyType
 import com.openlattice.hazelcast.HazelcastMap
 import com.openlattice.mechanic.Toolbox
 import com.openlattice.organization.roles.Role
-import com.openlattice.organizations.HazelcastOrganizationService
-import com.openlattice.organizations.Organization
-import com.openlattice.organizations.OrganizationMetadataEntitySetsService
+import com.openlattice.organizations.*
 import com.openlattice.organizations.roles.SecurePrincipalsManager
+import com.openlattice.postgres.DataTables
+import org.apache.olingo.commons.api.edm.FullQualifiedName
 import org.slf4j.LoggerFactory
 import java.util.*
 
 class CreateAllOrgMetadataEntitySets(
         private val toolbox: Toolbox,
-        private val metadataEntitySetsService: OrganizationMetadataEntitySetsService,
-        organizationService: HazelcastOrganizationService,
+        private val organizationService: HazelcastOrganizationService,
+        private val entitySetsManager: EntitySetManager,
         private val principalsManager: SecurePrincipalsManager,
-        private val authorizationManager: AuthorizationManager
+        private val authorizationManager: AuthorizationManager,
+        private val edmService: EdmManager
 ) : Upgrade {
 
     companion object {
         private val logger = LoggerFactory.getLogger(CreateAllOrgMetadataEntitySets::class.java)
     }
 
-    init {
-        metadataEntitySetsService.organizationService = organizationService
-    }
+    private lateinit var organizationMetadataEntityTypeId: UUID
+    private lateinit var datasetEntityTypeId: UUID
+    private lateinit var columnsEntityTypeId: UUID
+    private lateinit var omAuthorizedPropertyTypes: Map<UUID, PropertyType>
+    private lateinit var datasetsAuthorizedPropertTypes: Map<UUID, PropertyType>
+    private lateinit var columnAuthorizedPropertTypes: Map<UUID, PropertyType>
+    private lateinit var propertyTypes: Map<String, PropertyType>
+
+    private val ORGANIZATION_METADATA_ET = FullQualifiedName("ol.organization_metadata")
+    private val DATASETS_ET = FullQualifiedName("ol.dataset")
+    private val COLUMNS_ET = FullQualifiedName("ol.column")
 
     override fun upgrade(): Boolean {
         val orgs = HazelcastMap.ORGANIZATIONS.getMap(toolbox.hazelcast).toMap()
@@ -36,7 +50,7 @@ class CreateAllOrgMetadataEntitySets(
 
         orgs.values.forEach {
             logger.info("About to initialize metadata entity sets for organization ${it.title} [${it.id}]")
-            metadataEntitySetsService.initializeOrganizationMetadataEntitySets(adminRoles.getValue(it.id))
+            initializeOrganizationMetadataEntitySets(adminRoles.getValue(it.id))
             logger.info("Finished initializing metadata entity sets for organization ${it.title} [${it.id}]")
         }
 
@@ -110,6 +124,126 @@ class CreateAllOrgMetadataEntitySets(
     override fun getSupportedVersion(): Long {
         return Version.V2020_10_14.value
     }
+
+    private fun initializeFields() {
+        if (!this::organizationMetadataEntityTypeId.isInitialized) {
+            val om = edmService.getEntityType(ORGANIZATION_METADATA_ET)
+            organizationMetadataEntityTypeId = om.id
+            omAuthorizedPropertyTypes = edmService.getPropertyTypesAsMap(om.properties)
+
+        }
+        if (!this::datasetEntityTypeId.isInitialized) {
+            val ds = edmService.getEntityType(DATASETS_ET)
+            datasetEntityTypeId = ds.id
+            datasetsAuthorizedPropertTypes = edmService.getPropertyTypesAsMap(ds.properties)
+        }
+        if (!this::columnsEntityTypeId.isInitialized) {
+            val c = edmService.getEntityType(COLUMNS_ET)
+            columnsEntityTypeId = c.id
+            columnAuthorizedPropertTypes = edmService.getPropertyTypesAsMap(c.properties)
+        }
+        if (!this::propertyTypes.isInitialized) {
+            propertyTypes = (omAuthorizedPropertyTypes.values + datasetsAuthorizedPropertTypes.values + columnAuthorizedPropertTypes.values)
+                    .associateBy { it.type.fullQualifiedNameAsString }
+        }
+    }
+
+    fun isFullyInitialized(): Boolean = this::organizationMetadataEntityTypeId.isInitialized &&
+            this::datasetEntityTypeId.isInitialized && this::columnsEntityTypeId.isInitialized &&
+            this::omAuthorizedPropertyTypes.isInitialized && this::datasetsAuthorizedPropertTypes.isInitialized &&
+            this::columnAuthorizedPropertTypes.isInitialized && this::propertyTypes.isInitialized
+
+    fun initializeOrganizationMetadataEntitySets(adminRole: Role) {
+        initializeFields()
+        if (!isFullyInitialized()) {
+            return
+        }
+
+        val organizationId = adminRole.organizationId
+
+        val organizationMetadataEntitySetIds = organizationService.getOrganizationMetadataEntitySetIds(organizationId)
+        val organizationPrincipal = organizationService.getOrganizationPrincipal(organizationId)!!
+        var createdEntitySets = mutableSetOf<UUID>()
+
+        val organizationMetadataEntitySetId = if (organizationMetadataEntitySetIds.organization == UNINITIALIZED_METADATA_ENTITY_SET_ID) {
+            val organizationMetadataEntitySet = buildOrganizationMetadataEntitySet(organizationId)
+            val id = entitySetsManager.createEntitySet(adminRole.principal, organizationMetadataEntitySet)
+            createdEntitySets.add(id)
+            id
+        } else {
+            organizationMetadataEntitySetIds.organization
+        }
+
+        val datasetsEntitySetId = if (organizationMetadataEntitySetIds.datasets == UNINITIALIZED_METADATA_ENTITY_SET_ID) {
+            val datasetsEntitySet = buildDatasetsEntitySet(organizationId)
+            val id = entitySetsManager.createEntitySet(adminRole.principal, datasetsEntitySet)
+            createdEntitySets.add(id)
+            id
+        } else {
+            organizationMetadataEntitySetIds.datasets
+        }
+
+        val columnsEntitySetId = if (organizationMetadataEntitySetIds.columns == UNINITIALIZED_METADATA_ENTITY_SET_ID) {
+            val columnsEntitySet = buildColumnEntitySet(organizationId)
+            val id = entitySetsManager.createEntitySet(adminRole.principal, columnsEntitySet)
+            createdEntitySets.add(id)
+            id
+        } else {
+            organizationMetadataEntitySetIds.columns
+        }
+
+        if (createdEntitySets.isNotEmpty()) {
+            organizationService.setOrganizationMetadataEntitySetIds(
+                    organizationId,
+                    OrganizationMetadataEntitySetIds(
+                            organizationMetadataEntitySetId,
+                            datasetsEntitySetId,
+                            columnsEntitySetId
+                    )
+            )
+
+            entitySetsManager.getEntitySetsAsMap(createdEntitySets).values.forEach {
+                entitySetsManager.setupOrganizationMetadataAndAuditEntitySets(it)
+            }
+        }
+    }
+
+    private fun buildOrganizationMetadataEntitySet(organizationId: UUID): EntitySet = EntitySet(
+            organizationId = organizationId,
+            entityTypeId = organizationMetadataEntityTypeId,
+            name = buildOrganizationMetadataEntitySetName(organizationId),
+            _title = "Organization Metadata for $organizationId",
+            _description = "Organization Metadata for $organizationId",
+            contacts = mutableSetOf(),
+            flags = EnumSet.of(EntitySetFlag.METADATA)
+    )
+
+    private fun buildDatasetsEntitySet(organizationId: UUID): EntitySet = EntitySet(
+            organizationId = organizationId,
+            entityTypeId = datasetEntityTypeId,
+            name = buildDatasetsEntitySetName(organizationId),
+            _title = "Datasets for $organizationId",
+            _description = "Datasets for $organizationId",
+            contacts = mutableSetOf(),
+            flags = EnumSet.of(EntitySetFlag.METADATA)
+    )
+
+    private fun buildColumnEntitySet(organizationId: UUID): EntitySet = EntitySet(
+            organizationId = organizationId,
+            entityTypeId = columnsEntityTypeId,
+            name = buildColumnEntitySetName(organizationId),
+            _title = "Datasets for $organizationId",
+            _description = "Datasets for $organizationId",
+            contacts = mutableSetOf(),
+            flags = EnumSet.of(EntitySetFlag.METADATA)
+    )
+
+    private fun buildOrganizationMetadataEntitySetName(organizationId: UUID): String = DataTables.quote(
+            "org-metadata-$organizationId"
+    )
+
+    private fun buildDatasetsEntitySetName(organizationId: UUID): String = DataTables.quote("datasets-$organizationId")
+    private fun buildColumnEntitySetName(organizationId: UUID): String = DataTables.quote("column-$organizationId")
 
 
 }
