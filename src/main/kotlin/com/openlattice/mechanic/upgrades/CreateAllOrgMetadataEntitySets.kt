@@ -6,6 +6,7 @@ import com.openlattice.authorization.mapstores.PrincipalMapstore
 import com.openlattice.hazelcast.HazelcastMap
 import com.openlattice.mechanic.Toolbox
 import com.openlattice.organization.roles.Role
+import com.openlattice.organizations.HazelcastOrganizationService
 import com.openlattice.organizations.Organization
 import com.openlattice.organizations.OrganizationMetadataEntitySetsService
 import com.openlattice.organizations.roles.SecurePrincipalsManager
@@ -15,12 +16,17 @@ import java.util.*
 class CreateAllOrgMetadataEntitySets(
         private val toolbox: Toolbox,
         private val metadataEntitySetsService: OrganizationMetadataEntitySetsService,
+        organizationService: HazelcastOrganizationService,
         private val principalsManager: SecurePrincipalsManager,
         private val authorizationManager: AuthorizationManager
 ) : Upgrade {
 
     companion object {
         private val logger = LoggerFactory.getLogger(CreateAllOrgMetadataEntitySets::class.java)
+    }
+
+    init {
+        metadataEntitySetsService.organizationService = organizationService
     }
 
     override fun upgrade(): Boolean {

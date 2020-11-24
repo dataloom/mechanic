@@ -45,6 +45,8 @@ import com.openlattice.ids.HazelcastLongIdService
 import com.openlattice.mechanic.MechanicCli.Companion.UPGRADE
 import com.openlattice.mechanic.Toolbox
 import com.openlattice.mechanic.upgrades.*
+import com.openlattice.notifications.sms.PhoneNumberService
+import com.openlattice.organizations.HazelcastOrganizationService
 import com.openlattice.organizations.OrganizationMetadataEntitySetsService
 import com.openlattice.organizations.mapstores.OrganizationsMapstore
 import com.openlattice.organizations.roles.HazelcastPrincipalService
@@ -414,10 +416,40 @@ class MechanicUpgradePod {
     }
 
     @Bean
+    fun organizationService(): HazelcastOrganizationService {
+
+        val dbCredService = DbCredentialService(
+                toolbox.hazelcast,
+                HazelcastLongIdService(hazelcastClientProvider)
+        )
+        val assembler = Assembler(
+                dbCredService,
+                toolbox.hds,
+                authorizationManager(),
+                securePrincipalsManager(),
+                MetricRegistry(),
+                toolbox.hazelcast,
+                eventBus
+        )
+
+        return HazelcastOrganizationService(
+                hazelcastInstance,
+                aclKeyReservationService(),
+                authorizationManager(),
+                securePrincipalsManager(),
+                PhoneNumberService(hazelcastInstance),
+                partitionManager(),
+                assembler,
+                organizationMetadataEntitySetsService()
+        )
+    }
+
+    @Bean
     fun createAllOrgMetadataEntitySets(): CreateAllOrgMetadataEntitySets {
         return CreateAllOrgMetadataEntitySets(
                 toolbox,
                 organizationMetadataEntitySetsService(),
+                organizationService(),
                 securePrincipalsManager(),
                 authorizationManager()
         )
