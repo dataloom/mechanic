@@ -521,7 +521,8 @@ class MechanicUpgradePod {
                 entitySetManager(),
                 dataGraphManager(),
                 securePrincipalsManager(),
-                authorizationManager()
+                authorizationManager(),
+                hazelcastInstance
         )
     }
 

@@ -1,5 +1,6 @@
 package com.openlattice.mechanic.upgrades
 
+import com.hazelcast.core.HazelcastInstance
 import com.hazelcast.query.Predicates
 import com.openlattice.authorization.*
 import com.openlattice.authorization.mapstores.PrincipalMapstore
@@ -22,7 +23,8 @@ class CreateAllOrgMetadataEntitySets(
         entitySetManager: EntitySetManager,
         dataGraphManager: DataGraphManager,
         private val principalsManager: SecurePrincipalsManager,
-        private val authorizationManager: AuthorizationManager
+        private val authorizationManager: AuthorizationManager,
+        private val hazelcast: HazelcastInstance
 ) : Upgrade {
 
     companion object {
@@ -35,6 +37,8 @@ class CreateAllOrgMetadataEntitySets(
         metadataEntitySetsService.entitySetsManager = entitySetManager
     }
 
+    val orgsMapstore = HazelcastMap.ORGANIZATIONS.getMap(hazelcast)
+
     override fun upgrade(): Boolean {
         val orgs = HazelcastMap.ORGANIZATIONS.getMap(toolbox.hazelcast).toMap()
 
@@ -42,7 +46,12 @@ class CreateAllOrgMetadataEntitySets(
 
         orgs.values.forEach {
             logger.info("About to initialize metadata entity sets for organization ${it.title} [${it.id}]")
-            metadataEntitySetsService.initializeOrganizationMetadataEntitySets(adminRoles.getValue(it.id))
+//            metadataEntitySetsService.initializeOrganizationMetadataEntitySets(adminRoles.getValue(it.id))
+            orgsMapstore.executeOnKey(it.id) { entry ->
+                val org = entry.value
+                org.adminRoleAclKey = adminRoles.getValue(entry.key).aclKey
+                entry.setValue(org)
+            }
             logger.info("Finished initializing metadata entity sets for organization ${it.title} [${it.id}]")
         }
 
