@@ -20,18 +20,14 @@
  */
 package com.openlattice.mechanic.pods
 
-import com.codahale.metrics.MetricRegistry
 import com.geekbeast.hazelcast.HazelcastClientProvider
 import com.google.common.eventbus.EventBus
 import com.hazelcast.core.HazelcastInstance
-import com.openlattice.assembler.Assembler
 import com.openlattice.assembler.AssemblerConfiguration
 import com.openlattice.auditing.AuditingConfiguration
 import com.openlattice.auditing.pods.AuditingConfigurationPod
 import com.openlattice.authorization.AuthorizationManager
-import com.openlattice.authorization.DbCredentialService
 import com.openlattice.authorization.HazelcastAclKeyReservationService
-import com.openlattice.authorization.HazelcastAuthorizationService
 import com.openlattice.data.storage.partitions.PartitionManager
 import com.openlattice.datastore.services.EdmManager
 import com.openlattice.datastore.services.EdmService
@@ -40,14 +36,12 @@ import com.openlattice.datastore.services.EntitySetService
 import com.openlattice.edm.properties.PostgresTypeManager
 import com.openlattice.edm.schemas.SchemaQueryService
 import com.openlattice.edm.schemas.manager.HazelcastSchemaManager
-import com.openlattice.edm.schemas.postgres.PostgresSchemaQueryService
 import com.openlattice.hazelcast.pods.MapstoresPod
-import com.openlattice.ids.HazelcastLongIdService
 import com.openlattice.mechanic.MechanicCli.Companion.UPGRADE
 import com.openlattice.mechanic.Toolbox
 import com.openlattice.mechanic.upgrades.*
+import com.openlattice.organizations.OrganizationMetadataEntitySetsService
 import com.openlattice.organizations.mapstores.OrganizationsMapstore
-import com.openlattice.organizations.roles.HazelcastPrincipalService
 import com.openlattice.organizations.roles.SecurePrincipalsManager
 import com.openlattice.postgres.external.ExternalDatabaseConnectionManager
 import com.openlattice.postgres.mapstores.OrganizationAssemblyMapstore
@@ -300,12 +294,12 @@ class MechanicUpgradePod {
 
     @Bean
     fun postgresTypeManager(): PostgresTypeManager {
-        return PostgresTypeManager(hikariDataSource)
+        return PostgresTypeManager(hikariDataSource, hazelcastInstance)
     }
 
     @Bean
     fun schemaQueryService(): SchemaQueryService {
-        return PostgresSchemaQueryService(hikariDataSource)
+        return postgresTypeManager()
     }
 
     @Bean
@@ -324,6 +318,25 @@ class MechanicUpgradePod {
         )
     }
 
+    @Bean
+    fun organizationMetadataEntitySetsService(): OrganizationMetadataEntitySetsService {
+        return OrganizationMetadataEntitySetsService(edmManager())
+    }
+
+    @Bean
+    fun entitySetManager(): EntitySetManager {
+        return EntitySetService(
+                hazelcastInstance,
+                eventBus,
+                aclKeyReservationService,
+                authorizationManager,
+                partitionManager(),
+                edmManager(),
+                hikariDataSource,
+                organizationMetadataEntitySetsService(),
+                auditingConfiguration
+        )
+    }
 
     @Bean
     fun removeLinkingDataFromDataTable(): RemoveLinkingDataFromDataTable {
@@ -346,4 +359,34 @@ class MechanicUpgradePod {
         return CreateAndPopulateOrganizationDatabaseTable(toolbox, externalDatabaseConnectionManager)
     }
 
+    @Bean
+    fun createAllOrgMetadataEntitySets(): CreateAllOrgMetadataEntitySets {
+        return CreateAllOrgMetadataEntitySets(
+                toolbox,
+                organizationMetadataEntitySetsService(),
+                principalService,
+                authorizationManager
+        )
+    }
+
+    @Bean
+    fun cleanOutOrgMembersAndRoles(): CleanOutOrgMembersAndRoles {
+        return CleanOutOrgMembersAndRoles(toolbox, principalService, authorizationManager)
+    }
+
+    @Bean
+    fun grantAllOnStagingSchemaToOrgUser(): GrantAllOnStagingSchemaToOrgUser {
+        return GrantAllOnStagingSchemaToOrgUser(toolbox, externalDatabaseConnectionManager)
+    }
+
+    @Bean
+    fun cleanUpDeletedUsers(): CleanUpDeletedUsers {
+        return CleanUpDeletedUsers(toolbox)
+    }
+
+
+    @Bean
+    fun deleteDuplicateDataFromAtlasTables(): DeleteDuplicateDataFromAtlasTables {
+        return DeleteDuplicateDataFromAtlasTables(externalDatabaseConnectionManager)
+    }
 }
