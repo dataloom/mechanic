@@ -26,6 +26,7 @@ import com.openlattice.assembler.AssemblerConnectionManager
 import com.openlattice.assembler.PostgresRoles
 import com.openlattice.postgres.DataTables
 import com.openlattice.postgres.external.ExternalDatabaseConnectionManager
+import com.openlattice.postgres.external.Schemas
 import com.openlattice.postgres.mapstores.OrganizationAssemblyMapstore
 import java.util.*
 
@@ -50,8 +51,8 @@ class OrganizationDbUserSetup(
             dataSource.connection.use { connection ->
                 connection.createStatement()
                         .use { statement ->
-                            statement.execute("GRANT USAGE, CREATE ON SCHEMA ${AssemblerConnectionManager.OPENLATTICE_SCHEMA} TO $dbOrgUser")
-                            statement.execute("ALTER USER $dbOrgUser SET search_path TO ${AssemblerConnectionManager.OPENLATTICE_SCHEMA}")
+                            statement.execute("GRANT USAGE, CREATE ON SCHEMA ${Schemas.OPENLATTICE_SCHEMA} TO $dbOrgUser")
+                            statement.execute("ALTER USER $dbOrgUser SET search_path TO ${Schemas.OPENLATTICE_SCHEMA}")
                         }
             }
         }
