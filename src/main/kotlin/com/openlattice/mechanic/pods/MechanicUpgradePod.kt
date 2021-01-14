@@ -31,6 +31,7 @@ import com.openlattice.auditing.AuditingConfiguration
 import com.openlattice.auditing.pods.AuditingConfigurationPod
 import com.openlattice.authorization.AuthorizationManager
 import com.openlattice.authorization.DbCredentialService
+import com.openlattice.authorization.PrincipalsMapManager
 import com.openlattice.authorization.HazelcastAclKeyReservationService
 import com.openlattice.authorization.HazelcastAuthorizationService
 import com.openlattice.data.DataGraphManager
@@ -127,6 +128,9 @@ class MechanicUpgradePod {
 
     @Inject
     private lateinit var extDbPermsManager: ExternalDatabasePermissionsManager
+
+    @Inject
+    private lateinit var principalsMapManager: PrincipalsMapManager
 
     @Bean
     fun linking(): Linking {
@@ -261,6 +265,7 @@ class MechanicUpgradePod {
         return HazelcastPrincipalService(hazelcastInstance,
                 aclKeyReservationService(),
                 authorizationManager(),
+                principalsMapManager,
                 extDbPermsManager)
     }
 

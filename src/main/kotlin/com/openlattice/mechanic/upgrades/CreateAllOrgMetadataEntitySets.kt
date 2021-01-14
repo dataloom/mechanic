@@ -15,7 +15,7 @@ import java.util.*
 class CreateAllOrgMetadataEntitySets(
         private val toolbox: Toolbox,
         private val metadataEntitySetsService: OrganizationMetadataEntitySetsService,
-        private val principalsManager: SecurePrincipalsManager,
+        private val securePrincipalsManager: SecurePrincipalsManager,
         private val authorizationManager: AuthorizationManager
 ) : Upgrade {
 
@@ -68,10 +68,10 @@ class CreateAllOrgMetadataEntitySets(
                 .get(organization.getAclKey())
                 .filter { it.type == PrincipalType.USER }
 
-        val userOwnerAclKeys = userOwnerPrincipals.map { principalsManager.lookup(it) }.toSet()
+        val userOwnerAclKeys = userOwnerPrincipals.map { securePrincipalsManager.lookup(it) }.toSet()
 
-        principalsManager.createSecurablePrincipalIfNotExists(userOwnerPrincipals.first(), adminRole)
-        principalsManager.addPrincipalToPrincipals(adminRoleAclKey, userOwnerAclKeys)
+        securePrincipalsManager.createSecurablePrincipalIfNotExists(userOwnerPrincipals.first(), adminRole)
+        securePrincipalsManager.addPrincipalToPrincipals(adminRoleAclKey, userOwnerAclKeys)
 
         authorizationManager.addPermission(adminRoleAclKey, organization.principal, EnumSet.of(Permission.READ))
         authorizationManager.addPermission(organization.getAclKey(), adminRole.principal, EnumSet.allOf(Permission::class.java))

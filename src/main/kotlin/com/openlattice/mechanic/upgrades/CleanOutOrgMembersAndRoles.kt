@@ -12,7 +12,7 @@ import java.util.*
 
 class CleanOutOrgMembersAndRoles(
         private val toolbox: Toolbox,
-        private val principalsManager: SecurePrincipalsManager,
+        private val securePrincipalsManager: SecurePrincipalsManager,
         private val authorizationManager: AuthorizationManager
 ) : Upgrade {
 
@@ -31,7 +31,7 @@ class CleanOutOrgMembersAndRoles(
             logger.info("About to clean out members for org {} [{}]", it.title, it.id)
 
             val memberAclKeys = it.members.mapNotNull { p -> principals[p] }.toSet()
-            principalsManager.addPrincipalToPrincipals(it.getAclKey(), memberAclKeys)
+            securePrincipalsManager.addPrincipalToPrincipals(it.getAclKey(), memberAclKeys)
             authorizationManager.addPermissions(listOf(
                     Acl(
                             it.getAclKey(),
