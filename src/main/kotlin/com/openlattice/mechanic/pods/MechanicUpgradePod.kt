@@ -29,6 +29,7 @@ import com.hazelcast.core.HazelcastInstance
 import com.kryptnostic.rhizome.configuration.RhizomeConfiguration
 import com.openlattice.assembler.Assembler
 import com.openlattice.assembler.AssemblerConfiguration
+import com.openlattice.auditing.AuditRecordEntitySetsManager
 import com.openlattice.auditing.AuditingConfiguration
 import com.openlattice.auditing.pods.AuditingConfigurationPod
 import com.openlattice.authorization.*
@@ -440,8 +441,12 @@ class MechanicUpgradePod {
     }
 
     fun uninitializedOrganizationMetadataEntitySetsService(): OrganizationMetadataEntitySetsService {
-        val service = OrganizationMetadataEntitySetsService(edmManager(), authorizationManager())
-        return service
+        return OrganizationMetadataEntitySetsService(
+                hazelcastInstance,
+                edmManager(),
+                principalsMapManager(),
+                authorizationManager()
+        )
     }
 
     fun organizationMetadataEntitySetsService(): OrganizationMetadataEntitySetsService {
@@ -658,7 +663,7 @@ class MechanicUpgradePod {
         return ExternalDatabaseManagementService(
                 hazelcastInstance,
                 externalDatabaseConnectionManager,
-                securePrincipalsManager(),
+                principalsMapManager(),
                 aclKeyReservationService(),
                 authorizationManager(),
                 OrganizationExternalDatabaseConfiguration("", "", ""),
@@ -674,4 +679,27 @@ class MechanicUpgradePod {
         return AddSchemaToExternalTables(toolbox, externalDatabaseManagementService(), aclKeyReservationService())
     }
 
+    @Bean
+    fun deleteAndCreateOrgMetaEntitySets(): DeleteAndCreateOrgMetaEntitySets {
+        val metadata = organizationMetadataEntitySetsService()
+        return DeleteAndCreateOrgMetaEntitySets(
+                toolbox,
+                uninitializedOrganizationService(metadata),
+                uninitializedEntitySetManager(metadata),
+                metadata,
+                externalDatabaseManagementService(),
+                auditRecordEntitySetsManager()
+        )
+    }
+
+    @Bean
+    fun auditRecordEntitySetsManager(): AuditRecordEntitySetsManager {
+        val metadata = organizationMetadataEntitySetsService()
+        return uninitializedEntitySetManager(metadata).getAuditRecordEntitySetsManager()
+    }
+
+    @Bean
+    fun grantReadToOrgOnMetadataEntitySets(): GrantReadToOrgOnMetadataEntitySets {
+        return GrantReadToOrgOnMetadataEntitySets(toolbox, authorizationManager())
+    }
 }

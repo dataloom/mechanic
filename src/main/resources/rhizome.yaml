@@ -2,7 +2,7 @@
 # Rhizome Bootstrap Configuration
 ##
 
-# Set to false to disable persistence 
+# Set to false to disable persistence
 enable-persistence:  false
 session-clustering-enabled: false
 
